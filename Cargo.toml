@@ -1,0 +1,7 @@
+[package]
+name = "rustcat"
+version = "0.1.0"
+authors = ["Tomer Schwartz <tomeron12@gmail.com>"]
+
+[dependencies]
+ctrlc = { version = "3.0", features = ["termination"] }

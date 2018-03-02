@@ -1,12 +1,32 @@
 extern crate ctrlc;
-use std::sync::atomic::{AtomicBool, Ordering};
+extern crate futures;
+// extern crate futures_cpupool;
+extern crate tokio;
+extern crate tokio_io;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::env; 
-use std::io::stdin;
+use std::thread;
+use std::io::{self, BufRead};
 use std::io::prelude::*;
-use std::net::TcpStream;
+use std::sync::mpsc;
+use std::net;
 
+use tokio::net::TcpStream;
+
+
+fn stdin() -> std::sync::mpsc::Receiver<String>{
+    let (tx, rx) = mpsc::channel();
+    thread::spawn( move || {
+        loop{
+            let mut message = String::new();
+            io::stdin().read_line(&mut message).expect("how");
+            tx.send(message).unwrap();
+        }
+    });
+    rx
+}
 
 
 
@@ -14,6 +34,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let config = parse_config(&args);
     let mut message = String::new();
+    // let sleep_time = time::Duration::from_millis(100);
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
@@ -22,10 +43,25 @@ fn main() {
     println!("Waiting for Ctrl-C...");
     
     println!("ip: {}, port: {}", config.ip, config.port);
-    let mut client_stream = TcpStream::connect(format!("{}:{}", config.ip, config.port)).expect("Couldnt connect to target");
+    let addr = format!("{}:{}", config.ip, config.port).parse().unwrap();
+    let mut client_future = TcpStream::connect(& addr);
+    
+    let mut client_stream = TcpStream::connect(& addr);
+    let stdin_reciever =  stdin();
     while running.load(Ordering::SeqCst) {
-        // stdin().read_line(&mut message).expect("how");
-        // let _ = client_stream.write(message.as_bytes());
+        // thread::sleep(sleep_time);
+        message::from = match stdin_reciever.try_recv(){
+            Ok(result) => result,
+            Err(result) => { match result {
+               mpsc::TryRecvError::Empty => continue,
+               mpsc::TryRecvError::Disconnected => panic!("disconnected {}", result)
+                }
+            }
+
+        };
+
+        let _ = client_stream.write(message.as_bytes());
+
     }
     println!("Got it! Exiting...");
 }
